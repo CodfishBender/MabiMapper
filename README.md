@@ -1,6 +1,6 @@
 MabiMapper
 =============================================
-A Unity project capable of create meshes from region and area files.
+A Unity project used to render terrain from region and area files.
 
 
 System Requirements
