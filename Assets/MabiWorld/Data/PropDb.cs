@@ -43,7 +43,7 @@ namespace MabiWorld.Data
 	{
 		private readonly static Regex ExtraXmlFeatureRegex = new Regex(@"feature\s*=""(?<feature>[^""]+)""", RegexOptions.Compiled);
 
-		private static Dictionary<int, PropDbEntry> _entries = new Dictionary<int, PropDbEntry>();
+		private static Dictionary<int, PropDbEntry> _entries;
 
 		/// <summary>
 		/// Returns true if the db has any data loaded.
@@ -85,6 +85,7 @@ namespace MabiWorld.Data
 		/// <param name="filePath"></param>
 		public static void Load(string filePath)
 		{
+			_entries = new Dictionary<int, PropDbEntry>();
 			if (Path.GetFileName(filePath) != "propdb.xml")
 				throw new ArgumentException("Expected file called propdb.xml.");
 

@@ -2,6 +2,8 @@
 using System.IO;
 using System.Runtime.CompilerServices;
 using System.Text;
+using UnityEngine;
+using Color = UnityEngine.Color;
 
 namespace MabiWorld.Extensions
 {
@@ -238,10 +240,10 @@ namespace MabiWorld.Extensions
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		public static void WriteColor(this BinaryWriter bw, Color color)
 		{
-			bw.Write(color.B);
-			bw.Write(color.G);
-			bw.Write(color.R);
-			bw.Write(color.A);
+			bw.Write(color.b);
+			bw.Write(color.g);
+			bw.Write(color.r);
+			bw.Write(color.a);
 		}
 
 		/// <summary>
@@ -257,7 +259,7 @@ namespace MabiWorld.Extensions
 			var r = br.ReadByte();
 			var a = br.ReadByte();
 
-			return Color.FromArgb(a, r, g, b);
+			return new Color(a, r, g, b);
 		}
 
 		/// <summary>
@@ -273,10 +275,10 @@ namespace MabiWorld.Extensions
 				matrix[i] = br.ReadSingle();
 
 			return new Matrix4x4(
-				matrix[00], matrix[04], matrix[08], matrix[12],
-				matrix[01], matrix[05], matrix[09], matrix[13],
-				matrix[02], matrix[06], matrix[10], matrix[14],
-				matrix[03], matrix[07], matrix[11], matrix[15]
+				new Vector4(matrix[00], matrix[04], matrix[08], matrix[12]),
+				new Vector4(matrix[01], matrix[05], matrix[09], matrix[13]),
+				new Vector4(matrix[02], matrix[06], matrix[10], matrix[14]),
+				new Vector4(matrix[03], matrix[07], matrix[11], matrix[15])
 			);
 		}
 	}

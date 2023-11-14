@@ -1,6 +1,6 @@
-﻿using System.Drawing;
-using System.IO;
+﻿using System.IO;
 using MabiWorld.Extensions;
+using UnityEngine;
 
 namespace MabiWorld.FileFormats.PmgFormat
 {

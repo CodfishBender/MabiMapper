@@ -19,7 +19,7 @@ namespace MabiWorld.FileFormats.PmgFormat
 		/// <summary>
 		/// Returns a list with the PMG's meshes.
 		/// </summary>
-		public List<Mesh> Meshes { get; } = new List<Mesh>();
+		public List<Pmg> Meshes { get; } = new List<Pmg>();
 
 		/// <summary>
 		/// Reads a PMG from the given file and returns it.
@@ -48,7 +48,7 @@ namespace MabiWorld.FileFormats.PmgFormat
 			{
 				for (var i = 0; i < group.MeshCount; ++i)
 				{
-					var mesh = Mesh.ReadFrom(br);
+					var mesh = Pmg.ReadFrom(br);
 					result.Meshes.Add(mesh);
 				}
 			}

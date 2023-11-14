@@ -1,11 +1,11 @@
 ﻿using System.Collections.Generic;
 using System.ComponentModel;
-using System.Drawing;
 using System.Globalization;
 using System.IO;
 using System.Runtime.CompilerServices;
 using MabiWorld.Data;
 using MabiWorld.Extensions;
+using UnityEngine;
 
 namespace MabiWorld
 {
@@ -15,7 +15,7 @@ namespace MabiWorld
 	public class Prop : IEntity
 	{
 		public const int ColorCount = 9;
-		public static readonly Color DefaultColor = Color.FromArgb(0x00808080);
+		public static readonly Color DefaultColor = Color.white;
 
 		public int Id { get; set; }
 
@@ -68,7 +68,7 @@ namespace MabiWorld
 		public Vector3F TopRight { get; set; }
 
 		[DefaultValue(typeof(Color), "FFFFFFFF")]
-		public Color ColorOverride { get; set; } = Color.FromArgb(-1);
+		public Color ColorOverride { get; set; } = Color.white;
 
 		public Color[] Colors { get; set; } = new Color[ColorCount] { DefaultColor, DefaultColor, DefaultColor, DefaultColor, DefaultColor, DefaultColor, DefaultColor, DefaultColor, DefaultColor };
 
@@ -285,7 +285,7 @@ namespace MabiWorld
 
 			for (var i = 0; i < ColorCount; ++i)
 			{
-				if (this.Colors[i].ToArgb() != 0)
+				if (this.Colors[i] != Color.white)
 					prop.Colors[i] = this.Colors[i];
 			}
 
@@ -303,7 +303,7 @@ namespace MabiWorld
 		/// Sets prop's position and updates its shapes.
 		/// </summary>
 		/// <param name="pos"></param>
-		public void MoveTo(PointF pos)
+		public void MoveTo(System.Drawing.PointF pos)
 		{
 			this.MoveTo(pos.X, pos.Y, this.Position.Z);
 		}
@@ -314,7 +314,7 @@ namespace MabiWorld
 		/// <param name="pos"></param>
 		public void MoveTo(float x, float y, float z)
 		{
-			var delta = new SizeF(x - this.Position.X, y - this.Position.Y);
+			var delta = new System.Drawing.SizeF(x - this.Position.X, y - this.Position.Y);
 
 			this.Position = new Vector3F(x, y, z);
 			this.BottomLeft += delta;

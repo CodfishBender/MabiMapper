@@ -9,7 +9,7 @@ namespace MabiWorld.Data
 	/// </summary>
 	public static class Local
 	{
-		private static Dictionary<string, string> _entries = new Dictionary<string, string>();
+		private static Dictionary<string, string> _entries;
 		private static readonly string[] _toLoad = { "minimapinfo", "propdb" };
 
 		/// <summary>
@@ -58,6 +58,7 @@ namespace MabiWorld.Data
 		/// <param name="localFolderPath"></param>
 		public static void Load(string localFolderPath)
 		{
+			_entries = new Dictionary<string, string>();
 			localFolderPath = localFolderPath.Replace("\\", "/");
 			if (!localFolderPath.EndsWith("/"))
 				localFolderPath += "/";

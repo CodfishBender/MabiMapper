@@ -12,7 +12,7 @@ namespace MabiWorld.Data
 	/// </summary>
 	public static class PropPalette
 	{
-		private static List<Prop> _entries = new List<Prop>();
+		private static List<Prop> _entries;
 		private static int _version;
 
 		/// <summary>
@@ -116,7 +116,7 @@ namespace MabiWorld.Data
 		{
 			if (Path.GetExtension(filePath) != ".plt")
 				throw new ArgumentException("Expected '.plt' extension.");
-
+			_entries = new List<Prop>();
 			using (var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read))
 				Load(fs);
 		}
