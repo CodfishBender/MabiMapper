@@ -1,9 +1,7 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text.RegularExpressions;
 using System.Xml;
 using UnityEngine;
 
@@ -11,7 +9,7 @@ using UnityEngine;
 namespace MabiWorld.Data
 {
 	/// <summary>
-	/// Represents an entry in "data/db/propdb.xml::PropDB/PropClassList".
+	/// Represents an entry in "data/material/_define/material".
 	/// </summary>
 	public class MaterialDbEntry
 	{
@@ -38,7 +36,6 @@ namespace MabiWorld.Data
 	public static class MaterialDb
 	{
 		private static Dictionary<string, MaterialDbEntry> _entries = new();
-
 		/// <summary>
 		/// Returns true if the db has any data loaded.
 		/// </summary>
@@ -56,8 +53,8 @@ namespace MabiWorld.Data
 		/// </summary>
 		/// <param name="textureName"></param>
 		/// <returns></returns>
-		public static bool TryGetValue(string textureName, out MaterialDbEntry entry) {
-			return _entries.TryGetValue(textureName, out entry);
+		public static bool TryGetValue(string materialName, out MaterialDbEntry entry) {
+			return _entries.TryGetValue(materialName, out entry);
 		}
 
 		/// <summary>

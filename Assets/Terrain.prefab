@@ -44,8 +44,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 87faba1a62003ee4ea9e7c0a5672f9c0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _matTerrain: {fileID: 2100000, guid: 072f930549e06574eacad2e8178f8df2, type: 2}
-  _matPropCutout: {fileID: 2100000, guid: af163e53c4e6f534e82bae0efede8b75, type: 2}
-  _matPropOpaque: {fileID: 2100000, guid: 9f7e53c1c7f2fb646ab6c4710c3e85b3, type: 2}
-  _dataPath: 
-  _rgnPath: 
+  _defaultMatertial: {fileID: 2100000, guid: 072f930549e06574eacad2e8178f8df2, type: 2}
+  _dataPath: F:/Mabinogi/data
+  _rgnPath: F:/Mabinogi/data/world/Avon_main_field/Avon_main_field.rgn

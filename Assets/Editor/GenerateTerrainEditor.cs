@@ -7,32 +7,31 @@ public class GenerateTerrainEditor : Editor
     public override void OnInspectorGUI() {
         DrawDefaultInspector();
 
-        GenerateTerrain myScript = (GenerateTerrain)target;
+        GenerateTerrain script = (GenerateTerrain)target;
         GUILayoutOption guiLayoutHeight = GUILayout.Height(30);
+        GUILayoutOption propGuiWidth = GUILayout.Width(150);
 
         GUILayout.Space(20);
-        if (GUILayout.Button("Select Region File", guiLayoutHeight)) {
-            myScript.OpenRegionFile();
-        }
-        if (GUILayout.Button("Select Data Folder", guiLayoutHeight)) {
-            myScript.OpenDataFolder();
-        }
+        GUILayout.Label("Select Files", EditorStyles.whiteLargeLabel);
+        EditorGUILayout.BeginHorizontal();
+        if (GUILayout.Button("Region File", guiLayoutHeight)) script.OpenRegionFile();
+        if (GUILayout.Button("Data Folder", guiLayoutHeight)) script.OpenDataFolder();
+        EditorGUILayout.EndHorizontal();
         GUILayout.Space(20);
-        if (GUILayout.Button("GENERATE Terrain", guiLayoutHeight)) {
-            myScript.CreateTerrain();
-        }
-        if (GUILayout.Button("CLEAR Terrain", guiLayoutHeight)) {
-            myScript.ClearTerrain();
-        }
+        GUILayout.Label("Terrain", EditorStyles.whiteLargeLabel);
+        EditorGUILayout.BeginHorizontal();
+        if (GUILayout.Button("Generate", guiLayoutHeight)) script.CreateTerrain();
+        if (GUILayout.Button("Clear", guiLayoutHeight)) script.ClearTerrain();
+        EditorGUILayout.EndHorizontal();
         GUILayout.Space(20);
-        if (GUILayout.Button("UPDATE Props", guiLayoutHeight)) {
-            myScript.UpdateProps();
-        }
-        if (GUILayout.Button("SPAWN Props", guiLayoutHeight)) {
-            myScript.SpawnProps();
-        }
-        if (GUILayout.Button("CLEAR Props", guiLayoutHeight)) {
-            myScript.ClearProps();
-        }
+        GUILayout.Label("Props", EditorStyles.whiteLargeLabel);
+        if (GUILayout.Button("All Props", guiLayoutHeight)) script.SpawnProps(true, true, true);
+        EditorGUILayout.BeginHorizontal();
+        if (GUILayout.Button("Normal", guiLayoutHeight)) script.SpawnProps(true, false, false);
+        if (GUILayout.Button("Event", guiLayoutHeight)) script.SpawnProps(false, true, false);
+        if (GUILayout.Button("Disabled", guiLayoutHeight)) script.SpawnProps(false, false, true);
+        EditorGUILayout.EndHorizontal();
+        GUILayout.Space(10);
+        if (GUILayout.Button("Clear", guiLayoutHeight)) script.ClearProps();
     }
 }

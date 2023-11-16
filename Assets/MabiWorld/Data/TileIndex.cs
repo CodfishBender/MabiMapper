@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using DataDogLib;
+using UnityEngine;
 
 namespace MabiWorld.Data
 {
@@ -38,7 +40,14 @@ namespace MabiWorld.Data
 	/// </summary>
 	public static class TileIndex
 	{
-		private static readonly Dictionary<int, TileIndexEntry> _entries = new Dictionary<int, TileIndexEntry>();
+		private static Dictionary<int, TileIndexEntry> _entries = new Dictionary<int, TileIndexEntry>();
+
+		/// <summary>
+		/// Removes all entries.
+		/// </summary>
+		public static void Clear() {
+			_entries.Clear();
+		}
 
 		/// <summary>
 		/// Returns the tile with the given id via out. Returns false if
@@ -53,11 +62,21 @@ namespace MabiWorld.Data
 		}
 
 		/// <summary>
+		/// Loads tiles data from path.
+		/// </summary>
+		/// <param name="filePath"></param>
+		public static void Load(string filePath) {
+			Clear();
+			if (Path.GetFileName(filePath) != "tileindex.data")
+				throw new ArgumentException("Expected file called minimapinfo.xml.");
+			using (var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read))
+				Load(fs);
+		}
+		/// <summary>
 		/// Loads tiles from given stream of a data dog file.
 		/// </summary>
 		/// <param name="stream"></param>
-		public static void Load(Stream stream)
-		{
+		public static void Load(Stream stream) {
 			var dataDogFile = DataDogFile.Read(stream);
 
 			if (!dataDogFile.Lists.TryGetValue("TileList", out var objList))
@@ -75,7 +94,6 @@ namespace MabiWorld.Data
 				// KR281.
 				if (obj.Fields.TryGetValue("Property", out var property))
 					entry.Property = (byte)property.Value;
-
 				_entries[entry.TileID] = entry;
 			}
 		}

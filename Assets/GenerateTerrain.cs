@@ -11,9 +11,7 @@ using UnityEngine;
 
 public class GenerateTerrain : MonoBehaviour
 {
-	public Material _matTerrain;
-	public Material _matPropCutout;
-	public Material _matPropOpaque;
+	public Material _defaultMatertial;
 	public string _dataPath;
     public string _rgnPath;
 	Region _region;
@@ -204,9 +202,24 @@ public class GenerateTerrain : MonoBehaviour
 						}
 
 					}
+
+					// Get texture based on tile data
+					/*TileIndexEntry tileEntry;
+					Material areaPlaneMaterial = new Material(_defaultMatertial);
+					if (areaPlane.UseTiles == 0) {
+						TileIndex.TryGet(areaPlane.MaterialSlots[0], out tileEntry);
+					} else {
+						TileIndex.TryGet(areaPlane.MaterialSlotIndexes[0], out tileEntry);
+					}
+
+					// Add material & texture
+					if (tileEntry != null) {
+						TryAddMatAndTexture(tileEntry.TileName, out areaPlaneMaterial);
+					}*/
+
 					// Assign vertices and triangles to the mesh
 					areaPlaneMeshFilter.mesh = mesh;
-					areaPlaneMeshRenderer.material = _matTerrain;
+					areaPlaneMeshRenderer.material = _defaultMatertial;
 					mesh.vertices = newVertices;
 					mesh.triangles = newTriangles;
 					mesh.RecalculateNormals();
@@ -228,7 +241,7 @@ public class GenerateTerrain : MonoBehaviour
 	/// <summary>
 	/// Generates and populates the map with all props.
 	/// </summary>
-	public GameObject SpawnProps() {
+	public GameObject SpawnProps(bool spawnNormalProps, bool spawnEventProps, bool spawnDisabledProps) {
 		ClearProps();
 		LoadData(_dataPath);
 		_region = Region.ReadFromFile(_rgnPath);
@@ -250,6 +263,11 @@ public class GenerateTerrain : MonoBehaviour
 
 				// Return if object is null
 				if (propDb == null) continue;
+				bool isEventProp = (propDb.StringID.Value.Contains("/event/") && propDb.UsedServer);
+				if (isEventProp && !spawnEventProps) continue;
+				bool isDisabledProp = (!string.IsNullOrWhiteSpace(propDb.Feature) && !Features.IsEnabled(propDb.Feature));
+				if (isDisabledProp && !spawnDisabledProps) continue;
+				if (!isDisabledProp && !isEventProp && !spawnNormalProps) continue;
 
 				if (existingPropObj == null) {
 					// Generate new prop from file
@@ -265,15 +283,6 @@ public class GenerateTerrain : MonoBehaviour
         }
 
 		return propsObject;
-	}
-
-	void UpdatePropTransforms(Prop prop, Transform propObj) {
-		float propRot = prop.Rotation;
-		propObj.localPosition = new Vector3(prop.Position.X * _worldScale, prop.Position.Z * _worldScale, prop.Position.Y * _worldScale);
-		float rot = propRot * -Mathf.Rad2Deg - 90f;
-		propObj.localRotation = Quaternion.Euler(0, rot, 0);
-		propObj.localScale = new Vector3(prop.Scale * _worldScale, prop.Scale * _worldScale, prop.Scale * _worldScale);
-
 	}
 
 	/// <summary>
@@ -297,12 +306,9 @@ public class GenerateTerrain : MonoBehaviour
 		foreach (Pmg pmg in pmgs) {
 			if (pmg == null) continue;
 
-			// Add material
-			Material newMat;
-			MaterialDb.TryGetValue(pmg.TextureName, out MaterialDbEntry matDb);
 
 			// Create new object for each mesh
-			GameObject meshObject = new GameObject((matDb != null) ? matDb.RenderState : prop.ClassName);
+			GameObject meshObject = new GameObject(prop.ClassName);
 			meshObject.transform.parent = propObject.transform;
 
 			// Create mesh components
@@ -312,24 +318,11 @@ public class GenerateTerrain : MonoBehaviour
 			MeshRenderer propMeshRenderer = meshObject.AddComponent<MeshRenderer>();
 			MeshFilter propMeshFilter = meshObject.AddComponent<MeshFilter>();
 
-
-			// Material cont.
-            if (matDb != null) {
-				//Debug.Log(matDb.Silhouette + " | " + matDb.BodyVisible + " | " + matDb.EnableAlphaSort + " | " + matDb.ReceiveMainLight + "Texture: " + pmg.TextureName);
-				newMat = new Material(_matPropOpaque);
-			} else {
-				//Debug.Log("Texture: " + pmg.TextureName);
-				newMat = new Material(_matPropOpaque);
-			}
+			// Add material & texture
 			bool useTexture = false;
-			// Add texture
-			if (pmg.IsTextureMapped == 1) {
-				Texture2D tex = LoadTextureDXT(pmg.TextureName);
-				if (tex != null) {
-					newMat.mainTexture = tex;
-					useTexture = true;
-				}
-			}
+			Material meshMaterial = _defaultMatertial;
+			if (!pmg.TextureName.Equals("")) 
+				useTexture = TryAddMatAndTexture(pmg.TextureName, out meshMaterial);
 
 			// Add vertices
 			Vector3[] newVertices = new Vector3[pmg.Vertices.Count];
@@ -354,10 +347,11 @@ public class GenerateTerrain : MonoBehaviour
 
 			// Assign vertices and triangles to the mesh
 			propMeshFilter.mesh = mesh;
-			propMeshRenderer.material = newMat;
+			propMeshRenderer.material = meshMaterial;
 			mesh.vertices = newVertices;
 			mesh.triangles = newTriangles;
 			mesh.uv = newUV;
+			mesh.RecalculateNormals();
 
 			// Add mesh transforms
 			meshObject.transform.localPosition = pmg.Matrix1.GetPosition();
@@ -368,72 +362,126 @@ public class GenerateTerrain : MonoBehaviour
 	}
 
 	/// <summary>
+	/// Takes a texture name and atempts to assign 
+	/// </summary>
+	bool TryAddMatAndTexture(string textureName, out Material newMat) {
+        MaterialListEntry matEntry = null;
+		TextureFormat textureFormat = TextureFormat.Alpha8;
+
+		if (Render.TryGet(textureName, out TexMatListEntry texMatEntry))
+			Render.TryGet(texMatEntry.Material, out matEntry);
+
+		// If not in render data, check MaterialDb
+		if (texMatEntry == null || matEntry == null) {
+			MaterialDb.TryGetValue(textureName, out MaterialDbEntry matDb);
+			if (matDb != null) {
+				Material loadedMat = (Material)AssetDatabase.LoadAssetAtPath("Assets/RenderStates/" + matDb.RenderState + ".asset", typeof(Material));
+				if (loadedMat != null) {
+					newMat = new Material(loadedMat);
+				} else {
+					newMat = new Material(_defaultMatertial);
+					Debug.LogWarning("No material: " + "Assets/RenderStates/" + matDb.RenderState + ".asset");
+				}
+			} else {
+				newMat = new Material(_defaultMatertial);
+				Debug.LogWarning("No render or material data for: " + textureName);
+			}
+		} else {
+			// Get and set material data or default to rs_useGlossMapGloss
+			string matName = texMatEntry.Material;
+			AssetDatabase.Refresh();
+			Material loadedMat = (Material)AssetDatabase.LoadAssetAtPath("Assets/RenderStates/" + matEntry.RenderState + ".asset", typeof(Material));
+			Material materialToUse = loadedMat;
+
+			if (materialToUse == null) {
+				newMat = new Material(_defaultMatertial);
+				newMat.name = "DEFAULT "+ matName;
+			} else {
+				newMat = new Material(materialToUse);
+				newMat.name = matName;
+			}
+			// Set texture format
+			if (matEntry != null) {
+				textureFormat = matEntry.DdsType switch {
+					"" => TextureFormat.DXT1,
+					"dxt1" => TextureFormat.DXT1,
+					"dxt5" => TextureFormat.DXT5,
+					_ => TextureFormat.Alpha8,
+				};
+			}
+		}
+		// Load texture from file
+		Texture2D tex = LoadTextureDXT(textureName, textureFormat);
+		// Set texture
+		if (tex == null)
+			Debug.LogError("Texture not found: " + textureName);
+		else 
+			newMat.SetTexture("_MainTex", tex);
+		return true;
+	}
+
+	/// <summary>
 	/// Generates and populates the map with all props.
 	/// </summary>
 	public void ClearProps() {
 		DestroyImmediate(GameObject.FindGameObjectWithTag("Prop"));
 	}
+
 	/// <summary>
 	/// Updates all prop transforms.
 	/// </summary>
-	public void UpdateProps() {
+	void UpdatePropTransforms(Prop prop, Transform propObj) {
+		float propRot = prop.Rotation;
+		propObj.localPosition = new Vector3(prop.Position.X * _worldScale, prop.Position.Z * _worldScale, prop.Position.Y * _worldScale);
+		float rot = propRot * -Mathf.Rad2Deg - 90f;
+		propObj.localRotation = Quaternion.Euler(0, rot, 0);
+		propObj.localScale = new Vector3(prop.Scale * _worldScale, prop.Scale * _worldScale, prop.Scale * _worldScale);
 
-		LoadData(_dataPath);
-		_region = Region.ReadFromFile(_rgnPath);
-
-		// Iterate each prop
-		foreach (Area area in _region.Areas) {
-			foreach (Prop prop in area.Props) {
-				// Get existing prop
-				GameObject existingProp = GameObject.Find(prop.ClassName);
-				if (existingProp == null) continue;
-				// Set prop transforms
-				UpdatePropTransforms(prop, existingProp.transform);
-			}
-		}
 	}
+
 	/// <summary>
 	/// Loads data if data folder setting is valid.
 	/// </summary>
-	private void LoadData(String path) {
-		if (!Directory.Exists(path))
+	void LoadData(string regionPath) {
+		string path;
+		if (!Directory.Exists(regionPath))
 			return;
 
-		var localPath = Path.Combine(path, "local");
-		if (Directory.Exists(localPath))
-			Local.Load(localPath);
+		path = Path.Combine(regionPath, "local");
+		if (Directory.Exists(path)) Local.Load(path);
 
-		var featuresPath = Path.Combine(path, "features.xml.compiled");
-		if (File.Exists(featuresPath)) {
+		path = Path.Combine(regionPath, "features.xml.compiled");
+		if (File.Exists(path)) {
 			Features.Clear();
-			Features.Load(featuresPath);
+            Features.Load(path);
 			Features.SelectSetting("USA", false, false);
 		}
 
-		var propDbPath = Path.Combine(path, "db", "propdb.xml");
-		if (File.Exists(propDbPath))
-			PropDb.Load(propDbPath);
+		path = Path.Combine(regionPath, "db", "propdb.xml");
+		if (File.Exists(path)) PropDb.Load(path);
 
-		var matDbPath = Path.Combine(path, "material", "_define", "material");
-		if (Directory.Exists(matDbPath))
-			MaterialDb.Load(matDbPath);
+		path = Path.Combine(regionPath, "material", "_define", "material");
+		if (Directory.Exists(path)) MaterialDb.Load(path);
 
-		var propPalettePath = Path.Combine(path, "world", "proppalette.plt");
-		if (File.Exists(propPalettePath))
-			PropPalette.Load(propPalettePath);
+		path = Path.Combine(regionPath, "world", "proppalette.plt");
+		if (File.Exists(path)) PropPalette.Load(path);
 
-		var miniMapInfoPath = Path.Combine(path, "db", "minimapinfo.xml");
-		if (File.Exists(miniMapInfoPath))
-			MiniMapInfo.Load(miniMapInfoPath);
+		path = Path.Combine(regionPath, "db", "minimapinfo.xml");
+		if (File.Exists(path)) MiniMapInfo.Load(path);
+
+		path = Path.Combine(regionPath, "db", "tileindex.data");
+		if (File.Exists(path)) TileIndex.Load(path);
+
+		path = Path.Combine(regionPath, "db", "render.data");
+		if (File.Exists(path)) Render.Load(path);
 	}
 
-	public Texture2D LoadTextureDXT(String texName) {
+	Texture2D LoadTextureDXT(string texName, TextureFormat textureFormat) {
 
 		// Find texture
 		String texPath = Path.Combine(_dataPath, "material");
 		FileInfo texFileInfo = new DirectoryInfo(texPath).EnumerateFiles(texName + ".dds", SearchOption.AllDirectories).FirstOrDefault();
 		if (texFileInfo == null) {
-			Debug.LogError("Texture not found! " + texName);
 			return null;
 		}
 
@@ -445,8 +493,10 @@ public class GenerateTerrain : MonoBehaviour
 
 		int height = ddsBytes[13] * 256 + ddsBytes[12];
 		int width = ddsBytes[17] * 256 + ddsBytes[16];
+
+		// If invalid texture format, try infer type from file
 		int format = ddsBytes[87];
-		TextureFormat textureFormat = TextureFormat.DXT1;
+		textureFormat = TextureFormat.DXT1;
 		if (format == 53) textureFormat = TextureFormat.DXT5;
 
 		int DDS_HEADER_SIZE = 128;
