@@ -16,6 +16,7 @@ public class GenerateTerrain : MonoBehaviour
     public string _rgnPath;
 	Region _region;
 	float _worldScale = 0.01f;
+	Dictionary<string, Material> _texToMat;
 
 	/// <summary>
 	/// Shows the dialog for selecting the data folder.
@@ -135,19 +136,26 @@ public class GenerateTerrain : MonoBehaviour
 					MeshRenderer areaPlaneMeshRenderer = areaPlaneObject.AddComponent<MeshRenderer>();
 					MeshFilter areaPlaneMeshFilter = areaPlaneObject.AddComponent<MeshFilter>();
 					Vector3[] newVertices;
-					int[] newTriangles; 
+					int[] newTriangles;
+					Vector2[] newUV;
 
 					// Make single primitive if flat surface
 					if (areaPlane.MinHeight == areaPlane.MaxHeight) {
 						float height = areaPlane.MinHeight * _worldScale;
 						newVertices = new Vector3[4];
 						newTriangles = new int[6];
+						newUV = new Vector2[newVertices.Length];
 
 						// Vertex
 						newVertices[0] = new Vector3(0, height, 0);
 						newVertices[1] = new Vector3(0, height, planeSize * 4);
 						newVertices[2] = new Vector3(planeSize * 4, height, 0);
 						newVertices[3] = new Vector3(planeSize * 4, height, planeSize * 4);
+
+						// Assign UV
+						for (int i = 0; i < newVertices.Length; i++) {
+							newUV[i] = new Vector2(newVertices[i].x, newVertices[i].z).normalized;
+						}
 
 						// Tris
 						newTriangles[0] = 1;
@@ -161,12 +169,13 @@ public class GenerateTerrain : MonoBehaviour
 
 						newVertices = new Vector3[25]; // 25 planes per areaPlane
 						newTriangles = new int[150]; // 6 per vertex
+						newUV = new Vector2[newVertices.Length];
 
 						// Track plane iteration
 						int iPlane = 0;
 						// Iterate Planes on X axis
 						for (int iPlaneX = 0; iPlaneX < 5; iPlaneX++) {
-							// Iterate Planes on X axis
+							// Iterate Planes on Y axis
 							for (int iPlaneY = 0; iPlaneY < 5; iPlaneY++) {
 								// Get individual plane
 								MabiWorld.Plane plane = planes[iPlane];
@@ -176,6 +185,7 @@ public class GenerateTerrain : MonoBehaviour
 
 								// Set vertex coords
 								newVertices[iPlane] = new Vector3(planeX, plane.Height * _worldScale, planeY);
+
 
 								/* Planes don't hold triangle data so we have to assume which vertices connect.
 									[ 20 21 22 23 24 ]
@@ -196,15 +206,17 @@ public class GenerateTerrain : MonoBehaviour
 									newTriangles[iTri + 5] = iPlane + 5;
 								}
 
+								// Assign UV
+								newUV[iPlane] = new Vector2(newVertices[iPlane].x / planeSize, newVertices[iPlane].z / planeSize);
+
 								// Iterate plane
 								iPlane++;
 							}
 						}
-
 					}
 
 					// Get texture based on tile data
-					/*TileIndexEntry tileEntry;
+					TileIndexEntry tileEntry;
 					Material areaPlaneMaterial = new Material(_defaultMatertial);
 					if (areaPlane.UseTiles == 0) {
 						TileIndex.TryGet(areaPlane.MaterialSlots[0], out tileEntry);
@@ -215,13 +227,15 @@ public class GenerateTerrain : MonoBehaviour
 					// Add material & texture
 					if (tileEntry != null) {
 						TryAddMatAndTexture(tileEntry.TileName, out areaPlaneMaterial);
-					}*/
+					}
 
 					// Assign vertices and triangles to the mesh
 					areaPlaneMeshFilter.mesh = mesh;
-					areaPlaneMeshRenderer.material = _defaultMatertial;
+					areaPlaneMeshRenderer.material = areaPlaneMaterial;
 					mesh.vertices = newVertices;
 					mesh.triangles = newTriangles;
+					mesh.uv = newUV;
+					mesh.Optimize();
 					mesh.RecalculateNormals();
 
 					// Iterate area plane
@@ -351,6 +365,7 @@ public class GenerateTerrain : MonoBehaviour
 			mesh.vertices = newVertices;
 			mesh.triangles = newTriangles;
 			mesh.uv = newUV;
+			mesh.Optimize();
 			mesh.RecalculateNormals();
 
 			// Add mesh transforms
@@ -365,6 +380,8 @@ public class GenerateTerrain : MonoBehaviour
 	/// Takes a texture name and atempts to assign 
 	/// </summary>
 	bool TryAddMatAndTexture(string textureName, out Material newMat) {
+		if (_texToMat.TryGetValue(textureName, out newMat)) return true;
+
         MaterialListEntry matEntry = null;
 		TextureFormat textureFormat = TextureFormat.Alpha8;
 
@@ -412,6 +429,7 @@ public class GenerateTerrain : MonoBehaviour
 		}
 		// Load texture from file
 		Texture2D tex = LoadTextureDXT(textureName, textureFormat);
+		_texToMat[textureName] = newMat;
 		// Set texture
 		if (tex == null)
 			Debug.LogError("Texture not found: " + textureName);
@@ -443,6 +461,7 @@ public class GenerateTerrain : MonoBehaviour
 	/// Loads data if data folder setting is valid.
 	/// </summary>
 	void LoadData(string regionPath) {
+		_texToMat = new();
 		string path;
 		if (!Directory.Exists(regionPath))
 			return;
