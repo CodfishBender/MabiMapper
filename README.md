@@ -1,8 +1,15 @@
 MabiMapper
 =============================================
-A Unity project used to render terrain from region and area files.
-
 ![](preview.png)
+
+A Unity project designed to load and render terrain and props from Mabinogi's data folder.
+
+Features
+-------------------
+- Recreates all terrain geometry into Unity's Mesh format.
+- Loads terrain textures onto each areaPlane. (terrain tilesets not supported)
+- Recreates all prop meshes into Unity's Mesh format.
+- Textures and colors all props in the scene accordingly.
 
 System Requirements
 -------------------
