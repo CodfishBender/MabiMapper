@@ -1,8 +1,8 @@
 using MabiWorld;
 using MabiWorld.Data;
 using MabiWorld.FileFormats.PmgFormat;
+using MabiWorld.FileFormats.SetFormat;
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -15,13 +15,14 @@ public class GenerateTerrain : MonoBehaviour
 	public string _dataPath;
     public string _rgnPath;
 	Region _region;
-	float _worldScale = 0.01f;
-	Dictionary<string, Material> _texToMat;
+	float _worldScale = 0.01f; // Converts units from milimmeters to meters
+	Dictionary<string, string> _texPaths = new();
+	Dictionary<string, Material> _terrainMats = new();
 
 	/// <summary>
 	/// Shows the dialog for selecting the data folder.
 	/// </summary>
-	public void OpenDataFolder() {
+	public void OpenDataDialog() {
 		_dataPath = EditorUtility.OpenFolderPanel(
 					"Select Data Folder",
 					"Data",
@@ -31,19 +32,72 @@ public class GenerateTerrain : MonoBehaviour
 	/// <summary>
 	/// Shows the dialog for selecting the region file.
 	/// </summary>
-	public void OpenRegionFile() {
+	public void OpenRegionDialog() {
 		_rgnPath = EditorUtility.OpenFilePanel(
                     "Open file",
                     "Region File",
                     "rgn");
+		LoadData(_dataPath);
+	}
+
+	/// <summary>
+	/// Loads from data if data paths are valid.
+	/// </summary>
+	void LoadData(string dataPath) {
+		_region = Region.ReadFromFile(_rgnPath);
+		string path;
+		if (!Directory.Exists(dataPath)) {
+			Debug.LogError("Directory doesn't exist: " + dataPath);
+			return;
+		}
+
+		path = Path.Combine(dataPath, "local");
+		if (Directory.Exists(path)) Local.Load(path);
+
+		path = Path.Combine(dataPath, "features.xml.compiled");
+		if (File.Exists(path)) {
+			Features.Clear();
+			Features.Load(path);
+			Features.SelectSetting("USA", false, false);
+		}
+
+		path = Path.Combine(dataPath, "db", "propdb.xml");
+		if (File.Exists(path)) PropDb.Load(path);
+
+		path = Path.Combine(dataPath, "material", "_define", "material");
+		if (Directory.Exists(path)) MaterialDb.Load(path);
+
+		path = Path.Combine(dataPath, "material", "_define", "render_state");
+		if (Directory.Exists(path)) RenderStateDb.Load(path);
+
+		path = Path.Combine(dataPath, "world", "proppalette.plt");
+		if (File.Exists(path)) PropPalette.Load(path);
+
+		path = Path.Combine(dataPath, "db", "minimapinfo.xml");
+		if (File.Exists(path)) MiniMapInfo.Load(path);
+
+		path = Path.Combine(dataPath, "db", "tileindex.data");
+		if (File.Exists(path)) TileIndex.Load(path);
+
+		// Unused - render.data was made obsolete after a certain point (unknown when)
+		//path = Path.Combine(regionPath, "db", "render.data");
+		//if (File.Exists(path) && !Render.HasEntries) Render.Load(path);
 	}
 
 	/// <summary>
 	/// Begins the terrain generation process.
 	/// </summary>
 	public void CreateTerrain() {
-		ClearTerrain();
+		if (string.IsNullOrWhiteSpace(_dataPath) || !MaterialDb.HasEntries) {
+			Debug.LogError("Set data path before generating terrain.");
+			return;
+		}
 		LoadData(_dataPath);
+		if (!MaterialDb.HasEntries) {
+			Debug.LogError("No MaterialDb found!");
+			return;
+		}
+		ClearTerrain();
 
 		/* Mabinogi's terrain structure is as follows:
 			- Region
@@ -67,11 +121,7 @@ public class GenerateTerrain : MonoBehaviour
 				[ 0  1  2  3  4  ]
 		*/
 
-		_region = Region.ReadFromFile(_rgnPath);
-		if (_region == null) return;
-
-
-		// Plane size is Area width / planeX / areaPlaneSize (4)
+		// Plane size is Area width / planeX / areaPlaneSize(always 4)
 		// 5th row/column overlaps, so areaPlanes are only 4 planes wide
 		float planeSize = 200f * _worldScale; // Mabinogi's units are in millimeters, so each vertex is 200mm apart
 		float areaPlaneSize = planeSize * 4;
@@ -111,11 +161,9 @@ public class GenerateTerrain : MonoBehaviour
 					AreaPlane areaPlane = areaPlanes[iAreaPlane];
 
 					// Skip Plane if hidden
-					if (areaPlane.ShowPlane == 1) {
-						iAreaPlane++;
-						continue;
-					}
-					String areaPlaneName = "AreaPlane_" + iAreaPlaneX + "_" + iAreaPlaneY;
+					if (areaPlane.ShowPlane == 1) { iAreaPlane++; continue; }
+
+					string areaPlaneName = "AreaPlane_" + iAreaPlaneX + "_" + iAreaPlaneY;
 					float areaPlaneX = iAreaPlaneX * areaPlaneSize;
 					float areaPlaneY = iAreaPlaneY * areaPlaneSize;
 
@@ -130,14 +178,44 @@ public class GenerateTerrain : MonoBehaviour
 					areaPlaneObject.transform.localPosition = new Vector3(areaPlaneX, 0, areaPlaneY);
 
 					// Instantiate mesh object and attach it to mesh filter
-					Mesh mesh = new() {
-						name = "mesh_" + areaPlaneName
-					};
+					Mesh mesh = new();
 					MeshRenderer areaPlaneMeshRenderer = areaPlaneObject.AddComponent<MeshRenderer>();
 					MeshFilter areaPlaneMeshFilter = areaPlaneObject.AddComponent<MeshFilter>();
 					Vector3[] newVertices;
 					int[] newTriangles;
 					Vector2[] newUV;
+
+					// Get tile name and set ids for areaPlane
+					// ## I'm not smart enough to figure out tilesets, and Unity has no tileset terrain features to work with
+					/*
+					int[] tilesetIds;
+					if (areaPlane.UseTiles == 0) {
+						// Get tilesets
+						tilesetIds = new int[areaPlane.MaterialSlots.Length];
+						for (int i = 0; i < areaPlane.MaterialSlots.Length; i++) {
+							if (TileIndex.TryGet(areaPlane.MaterialSlots[i], out TileIndexEntry entry)) {
+								tileName = entry.TileName;
+								tilesetIds[i] = entry.TileID;
+							}
+						}
+					} else {
+						// Get individual tiles
+						tilesetIds = new int[areaPlane.MaterialSlotIndexes.Length];
+						for (int i = 0; i < areaPlane.MaterialSlotIndexes.Length; i++) {
+							if (TileIndex.TryGet(areaPlane.MaterialSlotIndexes[i], out TileIndexEntry entry)) {
+								tileName = entry.TileName;
+								tilesetIds[i] = entry.TileID;
+							}
+						}
+					}*/
+
+					// Set areaPlane texture
+					Material areaPlaneMat = _defaultMatertial;
+					if (TileIndex.TryGet(areaPlane.MaterialSlots[0], out TileIndexEntry tile))
+						// Try get existing material before generating a new one
+						if (!_terrainMats.TryGetValue(tile.TileName, out areaPlaneMat))
+							if (TryAddMatAndTexture(tile.TileName, out areaPlaneMat))
+								_terrainMats[tile.TileName] = areaPlaneMat;
 
 					// Make single primitive if flat surface
 					if (areaPlane.MinHeight == areaPlane.MaxHeight) {
@@ -166,7 +244,6 @@ public class GenerateTerrain : MonoBehaviour
 						newTriangles[4] = 3;
 						newTriangles[5] = 2;
 					} else {
-
 						newVertices = new Vector3[25]; // 25 planes per areaPlane
 						newTriangles = new int[150]; // 6 per vertex
 						newUV = new Vector2[newVertices.Length];
@@ -180,12 +257,10 @@ public class GenerateTerrain : MonoBehaviour
 								// Get individual plane
 								MabiWorld.Plane plane = planes[iPlane];
 
-								float planeX = iPlaneX * planeSize; // X coord
-								float planeY = iPlaneY * planeSize; // Y coord
+								float[] planeXY = { iPlaneX * planeSize, iPlaneY * planeSize }; // X coord
 
 								// Set vertex coords
-								newVertices[iPlane] = new Vector3(planeX, plane.Height * _worldScale, planeY);
-
+								newVertices[iPlane] = new Vector3(planeXY[0], plane.Height * _worldScale, planeXY[1]);
 
 								/* Planes don't hold triangle data so we have to assume which vertices connect.
 									[ 20 21 22 23 24 ]
@@ -207,7 +282,7 @@ public class GenerateTerrain : MonoBehaviour
 								}
 
 								// Assign UV
-								newUV[iPlane] = new Vector2(newVertices[iPlane].x / planeSize, newVertices[iPlane].z / planeSize);
+								newUV[iPlane] = new Vector2(newVertices[iPlane].x / planeSize, newVertices[iPlane].z / planeSize) * 0.25f;
 
 								// Iterate plane
 								iPlane++;
@@ -215,23 +290,9 @@ public class GenerateTerrain : MonoBehaviour
 						}
 					}
 
-					// Get texture based on tile data
-					TileIndexEntry tileEntry;
-					Material areaPlaneMaterial = new Material(_defaultMatertial);
-					if (areaPlane.UseTiles == 0) {
-						TileIndex.TryGet(areaPlane.MaterialSlots[0], out tileEntry);
-					} else {
-						TileIndex.TryGet(areaPlane.MaterialSlotIndexes[0], out tileEntry);
-					}
-
-					// Add material & texture
-					if (tileEntry != null) {
-						TryAddMatAndTexture(tileEntry.TileName, out areaPlaneMaterial);
-					}
-
 					// Assign vertices and triangles to the mesh
 					areaPlaneMeshFilter.mesh = mesh;
-					areaPlaneMeshRenderer.material = areaPlaneMaterial;
+					areaPlaneMeshRenderer.material = areaPlaneMat;
 					mesh.vertices = newVertices;
 					mesh.triangles = newTriangles;
 					mesh.uv = newUV;
@@ -256,9 +317,16 @@ public class GenerateTerrain : MonoBehaviour
 	/// Generates and populates the map with all props.
 	/// </summary>
 	public GameObject SpawnProps(bool spawnNormalProps, bool spawnEventProps, bool spawnDisabledProps) {
-		ClearProps();
+		if (string.IsNullOrWhiteSpace(_dataPath)) {
+			Debug.LogError("Set data path before spawning props.");
+			return null;
+		}
 		LoadData(_dataPath);
-		_region = Region.ReadFromFile(_rgnPath);
+		if (!MaterialDb.HasEntries) {
+			Debug.LogError("No MaterialDb found!");
+			return null;
+		}
+		ClearProps();
 
 		// Create Props parent
 		GameObject propsObject = new GameObject("Props");
@@ -272,75 +340,120 @@ public class GenerateTerrain : MonoBehaviour
 			foreach(Prop prop in area.Props) {
 				GameObject newPropObj;
 				GameObject existingPropObj = GameObject.Find(prop.ClassName);
+
 				// Try get prop xml data
 				PropDb.TryGetEntry(prop.Id, out PropDbEntry propDb);
 
 				// Return if object is null
-				if (propDb == null) continue;
-				bool isEventProp = (propDb.StringID.Value.Contains("/event/") && propDb.UsedServer);
+				if (propDb == null) {
+					Debug.LogWarning("Could not find prop ID: " + prop.Id);
+					continue;
+				}
+
+				bool isEventProp = propDb.StringID.Value.Contains("/event/") && propDb.UsedServer;
 				if (isEventProp && !spawnEventProps) continue;
-				bool isDisabledProp = (!string.IsNullOrWhiteSpace(propDb.Feature) && !Features.IsEnabled(propDb.Feature));
+				bool isDisabledProp = !string.IsNullOrWhiteSpace(propDb.Feature) && !Features.IsEnabled(propDb.Feature);
 				if (isDisabledProp && !spawnDisabledProps) continue;
 				if (!isDisabledProp && !isEventProp && !spawnNormalProps) continue;
 
 				if (existingPropObj == null) {
 					// Generate new prop from file
-					newPropObj = GenerateProp(prop, propDb);
+					newPropObj = GenerateProp(prop, prop.Colors);
 				} else {
 					// Duplicate prop if it already exists
-					newPropObj = Instantiate(existingPropObj);
+					newPropObj = CloneProp(existingPropObj, prop.Colors);
 				}
 				// Set prop transforms
 				newPropObj.transform.parent = propsObject.transform;
 				UpdatePropTransforms(prop, newPropObj.transform);
 			}
-        }
-
+		}
+		EditorWindow view = EditorWindow.GetWindow<SceneView>();
+		view.Repaint();
 		return propsObject;
+	}
+
+	/// <summary>
+	/// Clones an existing prop with updated colors.
+	/// </summary>
+	GameObject CloneProp(GameObject prop, Color[] colorOverrides) {
+		// Instantiate new prop
+		GameObject newProp = Instantiate(prop);
+		// Set colors for new prop
+		foreach (Renderer obj in newProp.GetComponentsInChildren<Renderer>()) {
+			
+			Color c = colorOverrides[obj.sharedMaterial.GetInteger("ColorIndex")];
+			obj.sharedMaterial.color = TextureFactor(c);
+			obj.transform.name = TextureFactor(c).ToString();
+		}
+		return newProp;
 	}
 
 	/// <summary>
 	/// Generates a new prop from the data folder.
 	/// </summary>
-	GameObject GenerateProp(Prop prop, PropDbEntry propDb) {
+	GameObject GenerateProp(Prop prop, Color[] colorOverrides) {
+		if (prop == null || prop.ClassName == null || prop.ClassName == "") return new GameObject("No prop data found for prop");
 
-		// Find file
-		String propPath = Path.Combine(_dataPath, "gfx", "scene");
-		FileInfo fileInfo = new DirectoryInfo(propPath).EnumerateFiles(prop.ClassName + ".pmg", SearchOption.AllDirectories).FirstOrDefault();
-		if (fileInfo == null) return new GameObject("#File Not Found " + prop.ClassName);
+		string propPath = Path.Combine(_dataPath, "gfx");
+		if (!Directory.Exists(propPath)) {
+			Debug.LogError("Directory not found: " + propPath);
+			return new GameObject("Directory not found: " + prop.ClassName);
+		}
+		PmgFile pmgFile;
 
-		// Fetch all meshes from file
-		List<Pmg> pmgs = PmgFile.ReadFrom(fileInfo.FullName).Meshes;
-		if (pmgs == null || pmgs.Count == 0) return new GameObject("#No Meshes in file " + prop.ClassName);
+		// Try get .set file
+		FileInfo setFileInfo = new DirectoryInfo(propPath).EnumerateFiles(prop.ClassName + ".set", SearchOption.AllDirectories).FirstOrDefault();
+		if (setFileInfo == null) {
+			Debug.LogError("No .set file found: " + prop.ClassName + ".set");
+			return new GameObject("No .set file found: " + prop.ClassName + ".set");
+		}
+
+		// Read set file data
+		SetFile setFile = SetFile.ReadFrom(setFileInfo.FullName);
+
+		// Fetch first pmg from set file
+		FileInfo pmgFileInfo = new DirectoryInfo(setFileInfo.Directory.FullName).EnumerateFiles(setFile.Items[0].FileName + ".pmg", SearchOption.AllDirectories).FirstOrDefault();
+		if (pmgFileInfo == null) {
+			Debug.LogError("No .pmg file found: " + setFile.Items[0].FileName + ".pmg");
+			return new GameObject("No .pmg file found: " + setFile.Items[0].FileName + ".pmg");
+		}
+
+		// Read all meshes from pmg file
+		pmgFile = PmgFile.ReadFrom(pmgFileInfo.FullName);
+
+		// Return if empty file
+		if (pmgFile.Meshes == null || pmgFile.Meshes.Count == 0) return new GameObject("No pmgs in file: " + pmgFileInfo.FullName + ".pmg");
 
 		// Create prop object
 		GameObject propObject = new GameObject(prop.ClassName);
 
-		// Iterate each mesh in prop
-		foreach (Pmg pmg in pmgs) {
-			if (pmg == null) continue;
 
+		// Iterate each mesh in prop
+		for (int i = 0; i < pmgFile.Meshes.Count; i++) {
+			Pmg pmg = pmgFile.Meshes[i];
+			if (pmg == null) continue;
+			if (pmg.TextureName.Equals("") || pmg.TextureName.Contains("__")) continue;
 
 			// Create new object for each mesh
 			GameObject meshObject = new GameObject(prop.ClassName);
 			meshObject.transform.parent = propObject.transform;
 
 			// Create mesh components
-			Mesh mesh = new Mesh() {
-				name = "mesh_" + propDb.ClassName
-			};
+			Mesh mesh = new Mesh() { name = "mesh_" + pmg.MeshName };
 			MeshRenderer propMeshRenderer = meshObject.AddComponent<MeshRenderer>();
 			MeshFilter propMeshFilter = meshObject.AddComponent<MeshFilter>();
 
-			// Add material & texture
-			bool useTexture = false;
-			Material meshMaterial = _defaultMatertial;
-			if (!pmg.TextureName.Equals("")) 
-				useTexture = TryAddMatAndTexture(pmg.TextureName, out meshMaterial);
+			// Add Material / Texture / Color
+			// Set colors for new prop
+			bool useTexture = TryAddMatAndTexture(pmg.TextureName, out Material meshMaterial);
+			Color c = colorOverrides[pmg.ColorIndex];
+			meshMaterial.color = TextureFactor(c);
+			meshMaterial.SetInteger("ColorIndex", pmg.ColorIndex);
 
 			// Add vertices
 			Vector3[] newVertices = new Vector3[pmg.Vertices.Count];
-			Vector2[] newUV = (useTexture) ? new Vector2[newVertices.Length] : null;
+			Vector2[] newUV = useTexture ? new Vector2[newVertices.Length] : null;
 			for (int iVertex = 0; iVertex < newVertices.Length; iVertex++) {
 				// Add vertex
 				Vertex v = pmg.Vertices[iVertex];
@@ -376,65 +489,49 @@ public class GenerateTerrain : MonoBehaviour
 		return propObject;
 	}
 
+	Color TextureFactor(Color baseColor) {
+		float d = 128f;
+		float r = Math.Min(baseColor.g / d, 1f);
+		float g = Math.Min(baseColor.b / d, 1f);
+		float b = Math.Min(baseColor.a / d, 1f);
+		return new Color(r, g, b, 1f);
+	}
+
 	/// <summary>
-	/// Takes a texture name and atempts to assign 
+	/// Takes a texture name and atempts to assign it to a material
 	/// </summary>
 	bool TryAddMatAndTexture(string textureName, out Material newMat) {
-		if (_texToMat.TryGetValue(textureName, out newMat)) return true;
 
-        MaterialListEntry matEntry = null;
-		TextureFormat textureFormat = TextureFormat.Alpha8;
+		// Load Unity material from materialDb data
+		if (MaterialDb.TryGetFromTexture(textureName, out MaterialDbEntry matDb)) {
 
-		if (Render.TryGet(textureName, out TexMatListEntry texMatEntry))
-			Render.TryGet(texMatEntry.Material, out matEntry);
-
-		// If not in render data, check MaterialDb
-		if (texMatEntry == null || matEntry == null) {
-			MaterialDb.TryGetValue(textureName, out MaterialDbEntry matDb);
-			if (matDb != null) {
-				Material loadedMat = (Material)AssetDatabase.LoadAssetAtPath("Assets/RenderStates/" + matDb.RenderState + ".asset", typeof(Material));
-				if (loadedMat != null) {
-					newMat = new Material(loadedMat);
-				} else {
-					newMat = new Material(_defaultMatertial);
-					Debug.LogWarning("No material: " + "Assets/RenderStates/" + matDb.RenderState + ".asset");
-				}
-			} else {
-				newMat = new Material(_defaultMatertial);
-				Debug.LogWarning("No render or material data for: " + textureName);
-			}
+			// Load Unity material from file
+			Material loadedMat = (Material)AssetDatabase.LoadAssetAtPath("Assets/RenderStates/" + matDb.RenderState + ".asset", typeof(Material));
+			// Create new temp material from loaded material
+			newMat = new Material(loadedMat) { name = matDb.RenderState };
 		} else {
-			// Get and set material data or default to rs_useGlossMapGloss
-			string matName = texMatEntry.Material;
-			AssetDatabase.Refresh();
-			Material loadedMat = (Material)AssetDatabase.LoadAssetAtPath("Assets/RenderStates/" + matEntry.RenderState + ".asset", typeof(Material));
-			Material materialToUse = loadedMat;
-
-			if (materialToUse == null) {
-				newMat = new Material(_defaultMatertial);
-				newMat.name = "DEFAULT "+ matName;
-			} else {
-				newMat = new Material(materialToUse);
-				newMat.name = matName;
-			}
-			// Set texture format
-			if (matEntry != null) {
-				textureFormat = matEntry.DdsType switch {
-					"" => TextureFormat.DXT1,
-					"dxt1" => TextureFormat.DXT1,
-					"dxt5" => TextureFormat.DXT5,
-					_ => TextureFormat.Alpha8,
-				};
-			}
+			// Material data cannot be found in database
+			// Create new temp material from default
+			newMat = new Material(_defaultMatertial) { name = textureName };
+			Debug.LogWarning("No material data for: " + textureName);
+			return false;
 		}
-		// Load texture from file
-		Texture2D tex = LoadTextureDXT(textureName, textureFormat);
-		_texToMat[textureName] = newMat;
-		// Set texture
-		if (tex == null)
-			Debug.LogError("Texture not found: " + textureName);
-		else 
-			newMat.SetTexture("_MainTex", tex);
+
+		// Try get existing texture path
+		if (!_texPaths.TryGetValue(textureName, out string texPath))
+			// Find texture in data folder
+			texPath = FindTexture(textureName);
+
+		if (texPath != null) {
+			// Load texture from file
+			Texture2D tex = LoadTextureDXT(texPath);
+			// Update path dictionary
+			_texPaths[textureName] = texPath;
+			// Set texture
+			if (tex != null) newMat.SetTexture("_MainTex", tex);
+		} else
+			return false;
+
 		return true;
 	}
 
@@ -457,68 +554,59 @@ public class GenerateTerrain : MonoBehaviour
 
 	}
 
-	/// <summary>
-	/// Loads data if data folder setting is valid.
-	/// </summary>
-	void LoadData(string regionPath) {
-		_texToMat = new();
-		string path;
-		if (!Directory.Exists(regionPath))
-			return;
-
-		path = Path.Combine(regionPath, "local");
-		if (Directory.Exists(path)) Local.Load(path);
-
-		path = Path.Combine(regionPath, "features.xml.compiled");
-		if (File.Exists(path)) {
-			Features.Clear();
-            Features.Load(path);
-			Features.SelectSetting("USA", false, false);
-		}
-
-		path = Path.Combine(regionPath, "db", "propdb.xml");
-		if (File.Exists(path)) PropDb.Load(path);
-
-		path = Path.Combine(regionPath, "material", "_define", "material");
-		if (Directory.Exists(path)) MaterialDb.Load(path);
-
-		path = Path.Combine(regionPath, "world", "proppalette.plt");
-		if (File.Exists(path)) PropPalette.Load(path);
-
-		path = Path.Combine(regionPath, "db", "minimapinfo.xml");
-		if (File.Exists(path)) MiniMapInfo.Load(path);
-
-		path = Path.Combine(regionPath, "db", "tileindex.data");
-		if (File.Exists(path)) TileIndex.Load(path);
-
-		path = Path.Combine(regionPath, "db", "render.data");
-		if (File.Exists(path)) Render.Load(path);
-	}
-
-	Texture2D LoadTextureDXT(string texName, TextureFormat textureFormat) {
-
+	string FindTexture(string texName) {
 		// Find texture
-		String texPath = Path.Combine(_dataPath, "material");
-		FileInfo texFileInfo = new DirectoryInfo(texPath).EnumerateFiles(texName + ".dds", SearchOption.AllDirectories).FirstOrDefault();
+		// Check terrain folder
+		string path = Path.Combine(_dataPath, "material", "terrain", texName, texName + ".dds");
+		if (File.Exists(path)) return path;
+
+		FileInfo texFileInfo = new DirectoryInfo(Path.Combine(_dataPath, "material", "fx")).EnumerateFiles(texName + ".dds", SearchOption.AllDirectories).FirstOrDefault();
+		if (texFileInfo == null)
+			texFileInfo = new DirectoryInfo(Path.Combine(_dataPath, "material", "obj")).EnumerateFiles(texName + ".dds", SearchOption.AllDirectories).FirstOrDefault();
+		if (texFileInfo == null)
+			texFileInfo = new DirectoryInfo(Path.Combine(_dataPath, "material", "etc")).EnumerateFiles(texName + ".dds", SearchOption.AllDirectories).FirstOrDefault();
+		if (texFileInfo == null)
+			texFileInfo = new DirectoryInfo(Path.Combine(_dataPath, "material", "interior")).EnumerateFiles(texName + ".dds", SearchOption.AllDirectories).FirstOrDefault();
+		if (texFileInfo == null)
+			texFileInfo = new DirectoryInfo(Path.Combine(_dataPath, "material", "char")).EnumerateFiles(texName + ".dds", SearchOption.AllDirectories).FirstOrDefault();
+		if (texFileInfo == null)
+			texFileInfo = new DirectoryInfo(Path.Combine(_dataPath, "material", "giant")).EnumerateFiles(texName + ".dds", SearchOption.AllDirectories).FirstOrDefault();
+		if (texFileInfo == null)
+			texFileInfo = new DirectoryInfo(Path.Combine(_dataPath, "material", "glossmap")).EnumerateFiles(texName + ".dds", SearchOption.AllDirectories).FirstOrDefault();
+		if (texFileInfo == null)
+			texFileInfo = new DirectoryInfo(Path.Combine(_dataPath, "material", "guildemblem")).EnumerateFiles(texName + ".dds", SearchOption.AllDirectories).FirstOrDefault();
+		if (texFileInfo == null)
+			texFileInfo = new DirectoryInfo(Path.Combine(_dataPath, "material", "monster")).EnumerateFiles(texName + ".dds", SearchOption.AllDirectories).FirstOrDefault();
+		if (texFileInfo == null)
+			texFileInfo = new DirectoryInfo(Path.Combine(_dataPath, "material", "statue")).EnumerateFiles(texName + ".dds", SearchOption.AllDirectories).FirstOrDefault();
+		// Return if nothing found
 		if (texFileInfo == null) {
+			Debug.LogError("Cannot find texture file: " + texName + ".dds");
 			return null;
 		}
+		return texFileInfo.FullName;
+	}
 
-		byte[] ddsBytes = File.ReadAllBytes(texFileInfo.FullName);
+	Texture2D LoadTextureDXT(string texPath) {
+
+		byte[] ddsBytes = File.ReadAllBytes(texPath);
 
 		// This header byte should be 124 for DDS image files
-		if (ddsBytes[4] != 124) 
-			throw new Exception("Invalid DDS DXTn texture. Unable to read");  
+		if (ddsBytes[4] != 124)
+			throw new Exception("Invalid DDS DXTn texture. Unable to read");
 
 		int height = ddsBytes[13] * 256 + ddsBytes[12];
 		int width = ddsBytes[17] * 256 + ddsBytes[16];
 
-		// If invalid texture format, try infer type from file
+		// Try infer texture format from file
 		int format = ddsBytes[87];
-		textureFormat = TextureFormat.DXT1;
-		if (format == 53) textureFormat = TextureFormat.DXT5;
-
-		int DDS_HEADER_SIZE = 128;
+        var textureFormat = format switch {
+            49 => TextureFormat.DXT1,
+            51 => TextureFormat.DXT5, // Unity doesn't support DXT3, so we use DXT5
+            53 => TextureFormat.DXT5,
+            _ => TextureFormat.DXT5,
+        };
+        int DDS_HEADER_SIZE = 128;
 		byte[] dxtBytes = new byte[ddsBytes.Length - DDS_HEADER_SIZE];
 		Buffer.BlockCopy(ddsBytes, DDS_HEADER_SIZE, dxtBytes, 0, ddsBytes.Length - DDS_HEADER_SIZE);
 

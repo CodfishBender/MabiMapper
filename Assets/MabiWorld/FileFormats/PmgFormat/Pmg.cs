@@ -1,6 +1,8 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using MabiWorld.Extensions;
+using UnityEngine;
 
 namespace MabiWorld.FileFormats.PmgFormat
 {
@@ -61,7 +63,7 @@ namespace MabiWorld.FileFormats.PmgFormat
 		/// <summary>
 		/// Gets or sets the name of the color to use (e.g. "b1").
 		/// </summary>
-		public string ColorName { get; set; }
+		public int ColorIndex { get; set; }
 
 		/// <summary>
 		/// Gets or sets the texture the mesh uses.
@@ -281,7 +283,8 @@ namespace MabiWorld.FileFormats.PmgFormat
 				result.JointName = br.ReadString(32);
 				result.StateName = br.ReadString(32);
 				result.NormalName = br.ReadString(32);
-				result.ColorName = br.ReadString(32);
+				string a = br.ReadString(32);
+				if (a != "") result.ColorIndex = int.Parse(a[1..]) - 1;
 			}
 
 			result.Matrix1 = br.ReadMatrix4x4();
@@ -329,8 +332,11 @@ namespace MabiWorld.FileFormats.PmgFormat
 
 				if (result.Version >= Version3)
 					result.Unk25 = br.ReadLpString();
-
-				result.ColorName = br.ReadLpString();
+				string a = br.ReadLpString();
+				try { 
+					if (!string.IsNullOrWhiteSpace(a)) 
+						result.ColorIndex = int.Parse(a[1..]) - 1; 
+				} catch(Exception ex) { Debug.LogError("Cannot parse ColorIndex as int: " + result.ColorIndex); Debug.LogError(ex); }
 				result.TextureName = br.ReadLpString();
 			}
 
@@ -370,5 +376,5 @@ namespace MabiWorld.FileFormats.PmgFormat
 
 			return result;
 		}
-	}
+    }
 }

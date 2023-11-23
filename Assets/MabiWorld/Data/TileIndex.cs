@@ -50,6 +50,11 @@ namespace MabiWorld.Data
 		}
 
 		/// <summary>
+		/// Returns true if the db has any data loaded.
+		/// </summary>
+		public static bool HasEntries => (_entries.Count > 0);
+
+		/// <summary>
 		/// Returns the tile with the given id via out. Returns false if
 		/// the tile id doesn't exist.
 		/// </summary>
@@ -68,7 +73,7 @@ namespace MabiWorld.Data
 		public static void Load(string filePath) {
 			Clear();
 			if (Path.GetFileName(filePath) != "tileindex.data")
-				throw new ArgumentException("Expected file called minimapinfo.xml.");
+				throw new ArgumentException("Expected file called tileindex.xml.");
 			using (var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read))
 				Load(fs);
 		}

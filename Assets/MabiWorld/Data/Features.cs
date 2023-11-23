@@ -53,6 +53,11 @@ namespace MabiWorld.Data
 		public static string Locale { get; private set; }
 
 		/// <summary>
+		/// Returns true if the db has any data loaded.
+		/// </summary>
+		public static bool HasEntries => (_features.Count > 0);
+
+		/// <summary>
 		/// Removes all entries.
 		/// </summary>
 		public static void Clear()

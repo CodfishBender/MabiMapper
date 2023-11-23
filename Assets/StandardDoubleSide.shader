@@ -29,6 +29,8 @@
 		_DetailNormalMapScale("Scale", Float) = 1.0
 		_DetailNormalMap("Normal Map", 2D) = "bump" {}
 
+		TextureFactor("TextureFactor", Color) = (0,0,0)
+
 		[Enum(UV0,0,UV1,1)] _UVSec("UV Set for secondary textures", Float) = 0
 
 

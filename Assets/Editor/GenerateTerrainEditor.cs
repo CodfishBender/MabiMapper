@@ -14,8 +14,8 @@ public class GenerateTerrainEditor : Editor
         GUILayout.Space(20);
         GUILayout.Label("Select Files", EditorStyles.whiteLargeLabel);
         EditorGUILayout.BeginHorizontal();
-        if (GUILayout.Button("Region File", guiLayoutHeight)) script.OpenRegionFile();
-        if (GUILayout.Button("Data Folder", guiLayoutHeight)) script.OpenDataFolder();
+        if (GUILayout.Button("Region File", guiLayoutHeight)) script.OpenRegionDialog();
+        if (GUILayout.Button("Data Folder", guiLayoutHeight)) script.OpenDataDialog();
         EditorGUILayout.EndHorizontal();
         GUILayout.Space(20);
         GUILayout.Label("Terrain", EditorStyles.whiteLargeLabel);

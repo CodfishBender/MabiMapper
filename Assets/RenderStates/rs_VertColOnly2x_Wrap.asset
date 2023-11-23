@@ -7,7 +7,7 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: rs_VertColOnly2x_Wrap
+  m_Name: rs_vertcolonly2x_wrap
   m_Shader: {fileID: 4800000, guid: cb7176a069d031e4990e6eb947e3d9c4, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0

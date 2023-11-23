@@ -31,15 +31,16 @@ namespace MabiWorld.Data
 	}
 
 	/// <summary>
-	/// Represents data's propdb.xml.
+	/// Represents data's material.xml.
 	/// </summary>
 	public static class MaterialDb
 	{
 		private static Dictionary<string, MaterialDbEntry> _entries = new();
+		private static Dictionary<string, MaterialDbEntry> _texturePaths = new();
 		/// <summary>
 		/// Returns true if the db has any data loaded.
 		/// </summary>
-		public static bool HasEntries => (_entries.Count > 0);
+		public static bool HasEntries => (_entries.Count > 0 || _texturePaths.Count > 0);
 
 		/// <summary>
 		/// Removes all entries.
@@ -49,12 +50,39 @@ namespace MabiWorld.Data
 		}
 
 		/// <summary>
+		/// Get all possible material names.
+		/// </summary>
+		public static string[] GetAllMaterialNames() {
+			return _entries.Select(z => z.Value.MaterialName).ToArray();
+		}
+
+		/// <summary>
+		/// Get all possible texture names.
+		/// </summary>
+		public static List<string> GetAllTextureNames() {
+			List<string> textureNames = new();
+			foreach(MaterialDbEntry entry in _entries.Values)
+				foreach (string tex in entry.Textures)
+					if (!textureNames.Contains(tex)) textureNames.Add(tex);
+			return textureNames;
+		}
+
+		/// <summary>
+		/// Returns the first material containing the string.
+		/// </summary>
+		/// <param name="materialName"></param>
+		/// <returns></returns>
+		public static bool TryGetFromMaterial(string materialName, out MaterialDbEntry entry) {
+			return _entries.TryGetValue(materialName, out entry);
+		}
+
+		/// <summary>
 		/// Returns the first material containing the string.
 		/// </summary>
 		/// <param name="textureName"></param>
 		/// <returns></returns>
-		public static bool TryGetValue(string materialName, out MaterialDbEntry entry) {
-			return _entries.TryGetValue(materialName, out entry);
+		public static bool TryGetFromTexture(string textureName, out MaterialDbEntry entry) {
+			return _entries.TryGetValue(textureName.ToLower(), out entry);
 		}
 
 		/// <summary>
@@ -75,7 +103,7 @@ namespace MabiWorld.Data
 		/// <summary>
 		/// Loads prop data from given XML file.
 		/// </summary>
-		/// <param name="filePath"></param>
+		/// <param name="stream"></param>
 		public static void Load(Stream stream) {
 			using (var sr = new StreamReader(stream, true))
 			using (var xmlReader = new XmlTextReader(sr)) {
@@ -83,7 +111,7 @@ namespace MabiWorld.Data
 				entry.Textures = new();
 
 				while (xmlReader.Read()) {
-					if (xmlReader.AttributeCount > 6) {
+					if (xmlReader.GetAttribute("RenderState") != null) {
 						entry.MaterialName = xmlReader.GetAttribute("Name");
 						entry.RenderState = xmlReader.GetAttribute("RenderState");
 						entry.GlossTexture = xmlReader.GetAttribute("GlossTexture");
@@ -105,7 +133,7 @@ namespace MabiWorld.Data
 					}
 				}
 				foreach (var tex in entry.Textures) {
-					_entries[tex] = entry;
+					_entries[tex.ToLower()] = entry;
 				}
 			}
 		}

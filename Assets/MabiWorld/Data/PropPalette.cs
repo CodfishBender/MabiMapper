@@ -12,8 +12,13 @@ namespace MabiWorld.Data
 	/// </summary>
 	public static class PropPalette
 	{
-		private static List<Prop> _entries;
+		private static List<Prop> _entries = new();
 		private static int _version;
+
+		/// <summary>
+		/// Returns true if the db has any data loaded.
+		/// </summary>
+		public static bool HasEntries => (_entries.Count > 0);
 
 		/// <summary>
 		/// Returns true if an entry with the given prop id exists.

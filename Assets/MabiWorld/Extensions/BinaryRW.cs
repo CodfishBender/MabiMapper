@@ -238,12 +238,11 @@ namespace MabiWorld.Extensions
 		/// <param name="bw"></param>
 		/// <param name="color"></param>
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-		public static void WriteColor(this BinaryWriter bw, Color color)
-		{
+		public static void WriteColor(this BinaryWriter bw, Color color) {
+			bw.Write(color.a);
 			bw.Write(color.b);
 			bw.Write(color.g);
 			bw.Write(color.r);
-			bw.Write(color.a);
 		}
 
 		/// <summary>

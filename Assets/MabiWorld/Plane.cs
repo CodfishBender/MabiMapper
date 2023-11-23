@@ -11,9 +11,9 @@ namespace MabiWorld
 	public class Plane
 	{
 		public float Height { get; set; }
-		public float Unk1 { get; set; }
-		public float Unk2 { get; set; }
-		public Color Unk3 { get; set; }
+		public float UVX { get; set; }
+		public float UVY { get; set; }
+		public Color VertColor { get; set; }
 
 		/// <summary>
 		/// Reads plane from reader and returns it.
@@ -29,10 +29,10 @@ namespace MabiWorld
 			plane.Height = br.ReadSingle();
 			if (areaPlaneVersion != null)
 			{
-				plane.Unk1 = br.ReadSingle();
-				plane.Unk2 = br.ReadSingle();
+				plane.UVX = br.ReadSingle();
+				plane.UVY = br.ReadSingle();
 			}
-			plane.Unk3 = br.ReadColor();
+			plane.VertColor = br.ReadColor();
 
 			return plane;
 		}
@@ -48,10 +48,10 @@ namespace MabiWorld
 			bw.Write(this.Height);
 			if (areaPlaneVersion != null)
 			{
-				bw.Write(this.Unk1);
-				bw.Write(this.Unk2);
+				bw.Write(this.UVX);
+				bw.Write(this.UVY);
 			}
-			bw.WriteColor(this.Unk3);
+			bw.WriteColor(this.VertColor);
 		}
 	}
 }

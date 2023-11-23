@@ -1,9 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using DataDogLib;
-using UnityEditor;
 using UnityEngine;
 
 namespace MabiWorld.Data
@@ -361,6 +359,11 @@ namespace MabiWorld.Data
 		private static Dictionary<string, MaterialListEntry> _materialList = new();
 		private static Dictionary<string, RenderStateListEntry> _renderStateList = new();
 		private static Dictionary<string, TexMatListEntry> _texMatList = new();
+
+		/// <summary>
+		/// Returns true if the db has any data loaded.
+		/// </summary>
+		public static bool HasEntries => (_materialList.Count > 0 || _renderStateList.Count > 0 || _texMatList.Count > 0);
 
 		/// <summary>
 		/// Removes all entries.
